@@ -541,23 +541,24 @@ bool LX200StarGo::syncHomePosition()
     {
         LOG_WARN("Synching home get LST failed.");
         SyncHomeSP.s = IPS_ALERT;
-        return false;
-    }
-
-    sprintf(cmd, ":X31%s#", input);
-    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
-
-    if (sendQuery(cmd, response))
-    {
-        LOG_INFO("Synching home position succeeded.");
-        SyncHomeSP.s = IPS_OK;
     }
     else
     {
-        LOG_WARN("Synching home position failed.");
-        SyncHomeSP.s = IPS_ALERT;
-        return false;
+        sprintf(cmd, ":X31%s#", input);
+        char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+
+        if (sendQuery(cmd, response))
+        {
+            LOG_INFO("Synching home position succeeded.");
+            SyncHomeSP.s = IPS_OK;
+        }
+        else
+        {
+            LOG_WARN("Synching home position failed.");
+            SyncHomeSP.s = IPS_ALERT;
+        }
     }
+    SyncHomeS[0].s = ISS_OFF;
     IDSetSwitch(&SyncHomeSP, nullptr);
     return true; 
 }
@@ -655,7 +656,7 @@ void LX200StarGo::getBasicData()
             SetParked(isParked);
             if (isSynched)
             {
-                SyncHomeS[0].s = ISS_ON;
+//                SyncHomeS[0].s = ISS_ON;
                 SyncHomeSP.s = IPS_OK;
                 IDSetSwitch(&SyncHomeSP, nullptr);
             }
