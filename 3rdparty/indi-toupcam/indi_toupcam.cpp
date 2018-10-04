@@ -490,22 +490,31 @@ bool TOUPCAM::Connect()
 
     SetCCDCapability(cap);
 
-    LOGF_DEBUG("maxSpeed: %d preview: %d still: %d maxFanSpeed %d", m_Instance->model->maxspeed, m_Instance->model->preview,
+    LOGF_DEBUG("%s() maxSpeed: %d preview: %d still: %d maxFanSpeed %d", __FUNCTION__, m_Instance->model->maxspeed, m_Instance->model->preview,
                                                                     m_Instance->model->still, m_Instance->model->maxfanspeed);
 
-    // Get min/max exposures
+// Get min/max exposures
     uint32_t min=0,max=0,current=0;
     Toupcam_get_ExpTimeRange(m_CameraHandle, &min, &max, &current);
-    LOGF_DEBUG("Exposure Time Range (us): Min %d Max %d Default %d", min, max, current);
+    LOGF_DEBUG("%s() Exposure Time Range (us): Min %d Max %d Default %d", __FUNCTION__, min, max, current);
     PrimaryCCD.setMinMaxStep("CCD_EXPOSURE", "CCD_EXPOSURE_VALUE", min/1000000.0, max/1000000.0, 0, false);
 
+    
     // Start callback
-    if (Toupcam_StartPullModeWithCallback(m_CameraHandle, &TOUPCAM::eventCB, this) < 0)
+//    if( !StopStreaming())  // Wait for switch before starting to stream
+    HRESULT rc=0;
+    if ((rc=Toupcam_StartPullModeWithCallback(m_CameraHandle, &TOUPCAM::eventCB, this)) < 0)
     {
+        LOGF_DEBUG("%s() Cannot start callback. Error: %s", __FUNCTION__, errorCodes[rc].c_str());
         Toupcam_Close(m_CameraHandle);
         return false;
     }
-
+    if ((rc = Toupcam_put_Option(m_CameraHandle, TOUPCAM_OPTION_TRIGGER, 1)) < 0)
+    {
+        LOGF_DEBUG("%s() Cannot set Trigger. Error: %s", __FUNCTION__, errorCodes[rc].c_str());
+        return false;        
+    }
+ 
     /*
      * Create the imaging thread and wait for it to start
      * N.B. Do we really need this with ToupCam?
@@ -1309,11 +1318,26 @@ bool TOUPCAM::ISNewSwitch(const char *dev, const char *name, ISState *states, ch
 
 bool TOUPCAM::StartStreaming()
 {
+    LOGF_DEBUG("%s()", __FUNCTION__);
+    HRESULT rc = 0;
+    if ((rc = Toupcam_put_Option(m_CameraHandle, TOUPCAM_OPTION_TRIGGER, 0)) < 0)
+    {
+        LOGF_DEBUG("%s() Cannot set trigger. Error: %s", __FUNCTION__, errorCodes[rc].c_str());
+        return false;        
+    }
     return true;
 }
 
 bool TOUPCAM::StopStreaming()
 {
+    LOGF_DEBUG("%s()", __FUNCTION__);
+    HRESULT rc=0;
+    if ((rc = Toupcam_put_Option(m_CameraHandle, TOUPCAM_OPTION_TRIGGER, 1)) < 0)
+    {
+        LOGF_DEBUG("%s() Cannot set trigger. Error: %s", __FUNCTION__, errorCodes[rc].c_str());
+        return false;        
+    }
+    
     return true;
 }
 
@@ -1367,17 +1391,28 @@ bool TOUPCAM::activateCooler(bool enable)
 
 bool TOUPCAM::StartExposure(float duration)
 {
+    LOGF_DEBUG("%s()", __FUNCTION__);
     HRESULT rc = 0;
     PrimaryCCD.setExposureDuration(static_cast<double>(duration));
     ExposureRequest = duration;
 
     uint32_t uSecs = static_cast<uint32_t>(duration * 1000000.0f);
 
-    LOGF_DEBUG("Starting exposure: %d us @ %s", uSecs, IUFindOnSwitch(&ResolutionSP)->label);
+    LOGF_DEBUG("%s() Starting exposure: %d us @ %s", __FUNCTION__, uSecs, IUFindOnSwitch(&ResolutionSP)->label);
 
     if ( (rc = Toupcam_put_ExpoTime(m_CameraHandle, uSecs)) < 0)
     {
         LOGF_ERROR("Failed to set exposure time. Error: %s", errorCodes[rc].c_str());
+        return false;
+    }   
+    if ((rc = Toupcam_put_Option(m_CameraHandle, TOUPCAM_OPTION_TRIGGER, 1)) < 0)
+    {
+        LOGF_DEBUG("%s() Cannot set trigger. Error: %s", __FUNCTION__, errorCodes[rc].c_str());
+        return false;        
+    }
+    if ( (rc = Toupcam_Trigger(m_CameraHandle, 1)) < 0)
+    {
+        LOGF_ERROR("%s() Failed to trigger Exposure. Error: %s", __FUNCTION__, errorCodes[rc].c_str());
         return false;
     }
 
@@ -1419,8 +1454,16 @@ bool TOUPCAM::StartExposure(float duration)
 
 bool TOUPCAM::AbortExposure()
 {
+    LOGF_DEBUG("%s()", __FUNCTION__);
     InExposure = false;
-#if 0
+    HRESULT rc=0;
+    if ( (rc = Toupcam_Trigger(m_CameraHandle, 0)) < 0)
+    {
+        LOGF_ERROR("%s() Failed to stop Exposure. Error: %s", errorCodes[rc].c_str());
+        return false;
+    }
+    
+ #if 0
     LOG_DEBUG("AbortExposure");
     pthread_mutex_lock(&condMutex);
     threadRequest = StateAbort;
