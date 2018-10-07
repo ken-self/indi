@@ -129,6 +129,8 @@ void ISInit()
                 gp_list_get_name(list, cameraIndex, &model);
                 gp_list_get_value(list, cameraIndex, &port);
 
+                IDLog("Detected camera model %s on port %s\n", model, port);
+
                 cameraIndex++;
                 availableCameras--;
 
@@ -512,6 +514,7 @@ bool GPhotoCCD::updateProperties()
         }
 
         defineSwitch(&streamSubframeSP);
+        defineSwitch(&forceBULBSP);
 
         //timerID = SetTimer(POLLMS);
     }
@@ -542,9 +545,9 @@ bool GPhotoCCD::updateProperties()
         deleteProperty(SDCardImageSP.name);
 
         deleteProperty(streamSubframeSP.name);
+        deleteProperty(forceBULBSP.name);
 
         HideExtendedOptions();
-        //rmTimer(timerID);
     }
 
     return true;
