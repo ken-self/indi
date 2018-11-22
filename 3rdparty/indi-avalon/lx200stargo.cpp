@@ -118,7 +118,7 @@ LX200StarGo::LX200StarGo()
     DBG_SCOPE = INDI::Logger::DBG_DEBUG;
 
     /* missing capabilities
-     * TELESCOPE_HAS_TIME: 
+     * TELESCOPE_HAS_TIME:
      *    missing commands - values can be set but not read
      *      :GG# (Get UTC offset time)
      *      :GL# (Get Local Time in 24 hour format)
@@ -143,7 +143,7 @@ LX200StarGo::LX200StarGo()
     setLX200Capability(LX200_HAS_PULSE_GUIDING );
 
     SetTelescopeCapability(TELESCOPE_CAN_PARK | TELESCOPE_CAN_SYNC | TELESCOPE_CAN_GOTO | TELESCOPE_CAN_ABORT |
-                           TELESCOPE_HAS_TRACK_MODE | TELESCOPE_HAS_LOCATION | TELESCOPE_CAN_CONTROL_TRACK | 
+                           TELESCOPE_HAS_TRACK_MODE | TELESCOPE_HAS_LOCATION | TELESCOPE_CAN_CONTROL_TRACK |
                            TELESCOPE_HAS_PIER_SIDE , 4);
 }
 
@@ -184,7 +184,7 @@ bool LX200StarGo::Handshake()
     time_t now = time (nullptr);
     strftime(cmddate, 32, ":X50%d%m%y#", localtime(&now));
 
-    const char* cmds[12][2]={ 
+    const char* cmds[12][2]={
         ":TTSFG#", "0",
         ":X3E1#", nullptr,
         ":TTHS1#", nullptr,
@@ -213,7 +213,7 @@ bool LX200StarGo::Handshake()
         {
             LOGF_ERROR("Unexpected response %s", response);
             continue;
-        } 
+        }
     }
     return true;
 }
@@ -347,7 +347,7 @@ bool LX200StarGo::ISNewNumber(const char *dev, const char *name, double values[]
             return result;
         }
     }
- 
+
     //  Nobody has claimed this, so pass it to the parent
     return LX200Telescope::ISNewNumber(dev, name, values, names, n);
 }
@@ -528,7 +528,7 @@ bool LX200StarGo::ReadScopeStatus()
 
     TrackState = newTrackState;
     NewRaDec(currentRA, currentDEC);
-    
+
     return syncSideOfPier();
 }
 
@@ -541,6 +541,7 @@ bool LX200StarGo::syncHomePosition()
     LOG_DEBUG(__FUNCTION__);
     char input[AVALON_RESPONSE_BUFFER_LENGTH];
     char cmd[AVALON_COMMAND_BUFFER_LENGTH];
+    bool ret = false;
     if (!getLST_String(input))
     {
         LOG_WARN("Synching home get LST failed.");
@@ -555,6 +556,7 @@ bool LX200StarGo::syncHomePosition()
         {
             LOG_INFO("Synching home position succeeded.");
             SyncHomeSP.s = IPS_OK;
+            ret = true;
         }
         else
         {
@@ -564,7 +566,7 @@ bool LX200StarGo::syncHomePosition()
     }
     SyncHomeS[0].s = ISS_OFF;
     IDSetSwitch(&SyncHomeSP, nullptr);
-    return true; 
+    return ret;
 }
 
 /**************************************************************************************
@@ -574,39 +576,26 @@ bool LX200StarGo::syncHomePosition()
 bool LX200StarGo::slewToHome(ISState* states, char* names[], int n)
 {
     LOG_DEBUG(__FUNCTION__);
-    // Command  - :X361#
-    // Response - pA#
-    //            :Z1303#
-    //            p0#
-    //            :Z1003#
-    //            p0#
     IUUpdateSwitch(&MountGotoHomeSP, states, names, n);
     if (setMountGotoHome())
     {
-        LOG_ERROR("Failed to send mount goto home command.");
-        MountGotoHomeSP.s = IPS_ALERT;
-    }
-    else if (strcmp(response, "pA") != 0)
-    {
-        LOGF_ERROR("Invalid slew home response '%s'.", response);
-        MountGotoHomeSP.s = IPS_ALERT;
+        MountGotoHomeSP.s = IPS_BUSY;
+        TrackState = SCOPE_SLEWING;
     }
     else
     {
-        MountGotoHomeSP.s = IPS_BUSY;
-        TrackState = SCOPE_SLEWING;
-        LOG_INFO("Slewing to home position...");
+        MountGotoHomeSP.s = IPS_ALERT;
     }
     MountGotoHomeS[0].s = ISS_OFF;
     IDSetSwitch(&MountGotoHomeSP, nullptr);
+
+    LOG_INFO("Slewing to home position...");
     return true;
 }
 
 bool LX200StarGo::setParkPosition(ISState* states, char* names[], int n)
 {
     LOG_DEBUG(__FUNCTION__);
-    // Command  - :X352#
-    // Response - 0#
     IUUpdateSwitch(&MountSetParkSP, states, names, n);
     MountSetParkSP.s = setMountParkPosition() ? IPS_OK : IPS_ALERT;
     MountSetParkS[0].s = ISS_OFF;
@@ -709,8 +698,8 @@ void LX200StarGo::getBasicData()
         sendScopeTime();
 //FIXME collect othr fixed data here like Manufacturer, version etc...
     if (genericCapability & LX200_HAS_PULSE_GUIDING)
-        usePulseCommand = true;   
-   
+        usePulseCommand = true;
+
 }
 
 /**************************************************************************************
@@ -770,7 +759,7 @@ bool LX200StarGo::sendScopeLocation()
     if(!setLocalSiderealTime(siteLong))
     {
         LOG_ERROR("Error setting local sidereal time");
-        return false; 
+        return false;
     }
 
     return true;
@@ -809,7 +798,7 @@ bool LX200StarGo::updateLocation(double latitude, double longitude, double eleva
     if(!setLocalSiderealTime(longitude))
     {
         LOG_ERROR("Error setting local sidereal time");
-        return false; 
+        return false;
     }
     return true;
 }
@@ -818,7 +807,7 @@ double LX200StarGo::LocalSiderealTime(double longitude)
 {
     double lst = get_local_sidereal_time(longitude);
 //    double SD = ln_get_apparent_sidereal_time(ln_get_julian_from_sys()) - (360.0 - longitude) / 15.0;
-//    double lst =  range24(SD);   
+//    double lst =  range24(SD);
     return lst;
 }
 bool LX200StarGo::setLocalSiderealTime(double longitude)
@@ -1694,7 +1683,7 @@ bool LX200StarGo::SetMeridianFlipMode(int index)
         return true;
     }
 // 0: Auto mode: Enabled and not Forced
-// 1: Disabled mode: Disabled and not Forced 
+// 1: Disabled mode: Disabled and not Forced
 // 2: Forced mode: Enabled and Forced
     if( index > 2)
     {
@@ -1707,7 +1696,7 @@ bool LX200StarGo::SetMeridianFlipMode(int index)
     if(!sendQuery(enablecmd, response) || !sendQuery(forcecmd, response))
     {
         LOGF_ERROR("Cannot set Meridian Flip Mode %d", index);
-        return false;        
+        return false;
     }
     return true;
 }
@@ -1716,7 +1705,7 @@ bool LX200StarGo::GetMeridianFlipMode(int* index)
     LOG_DEBUG(__FUNCTION__);
 
 // 0: Auto mode: Enabled and not Forced
-// 1: Disabled mode: Disabled and not Forced 
+// 1: Disabled mode: Disabled and not Forced
 // 2: Forced mode: Enabled and Forced
     const char* enablecmd = ":TTGFs#";
     const char* forcecmd  = ":TTGFd#";
@@ -1725,7 +1714,7 @@ bool LX200StarGo::GetMeridianFlipMode(int* index)
     if(!sendQuery(enablecmd, enableresp) || !sendQuery(forcecmd, forceresp))
     {
         LOGF_ERROR("Cannot get Meridian Flip Mode %s %s", enableresp, forceresp);
-        return false;        
+        return false;
     }
     int enable = 0;
     if (! sscanf(enableresp, "vs%01d", &enable))
@@ -2000,7 +1989,7 @@ bool LX200StarGo::SetTrackRate(double raRate, double deRate)
     if(!sendQuery(cmd, response, 0))
     {
         LOGF_ERROR("Failed to set tracking t %d", rate);
-        return false;        
+        return false;
     }
     return true;
 }
