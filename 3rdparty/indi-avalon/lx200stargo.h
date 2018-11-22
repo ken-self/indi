@@ -170,10 +170,11 @@ protected:
     virtual bool setSiteLatitude(double Lat);
     virtual bool setSiteLongitude(double Long);
 //    virtual bool querySetTracking(bool enable);
-    virtual bool getParkSync(bool *isParked, bool *isSynched);
+    virtual bool getMotorStatus(int *xSpeed, int *ySpeed);
+    virtual bool getParkHomeStatus (char* status);
 //    virtual bool queryIsSlewComplete();
-//    virtual bool querySendMountGotoHome();
-//    virtual bool querySendMountSetPark();
+    virtual bool setMountGotoHome();
+    virtual bool setMountParkPosition();
 
     // guiding
     virtual bool getST4Status(bool *isEnabled);

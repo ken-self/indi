@@ -113,7 +113,7 @@ void ISSnoopDevice(XMLEle *root)
 LX200StarGo::LX200StarGo()
 {
     LOG_DEBUG(__FUNCTION__);
-    setVersion(0, 5);
+    setVersion(0, 6);
 
     DBG_SCOPE = INDI::Logger::DBG_DEBUG;
 
@@ -456,57 +456,62 @@ bool LX200StarGo::ReadScopeStatus()
         mountSim();
         return true;
     }
-    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
-    if(!sendQuery(":X34#", response))
-    {
-        LOG_ERROR("Failed to get motor state");
-        return false;
-    }
-    int x, y;
-    int returnCode = sscanf(response, "m%01d%01d", &x, &y);
-    if (returnCode < 2)
-    {
-       LOGF_ERROR("Failed to parse motor state response '%s'.", response);
-       return false;
-    }
-//    LOGF_DEBUG("Motor state = (%d, %d)", x, y);
-    if(!sendQuery(":X38#", response))
-    {
-        LOG_ERROR("Failed to get park state");
-        return false;
-    }
-    if(strlen(response) != 2 || response[0] != 'p')
-    {
-       LOGF_ERROR("Failed to parse motor state response '%s'.", response);
-       return false;
-    }
-// p2 => PARKED
-// m00 => IDLE
-// pB => PARKING
-// m5* => SLEWING
-// m*5 => SLEWING
-// m1* => TRACKING
-// m*1 => TRACKING
-    INDI::Telescope::TelescopeStatus newTrackState = TrackState;
-    if(strcmp(response, "p2")==0)
-        newTrackState = SCOPE_PARKED;
-    else if(x==0 && y==0)
-        newTrackState = SCOPE_IDLE;
-    else if(strcmp(response, "pB")==0)
-        newTrackState = SCOPE_PARKING;
-    else if(x==5 || y==5)
-        newTrackState = SCOPE_SLEWING;
-    else
-        newTrackState = SCOPE_TRACKING;  // or GUIDING
 
-// Use X590 for RA DEC
+    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+    int x, y;
+
+    if (! getMotorStatus(&x, &y))
+    {
+       LOG_ERROR("Cannot determine scope status, failed to parse motor state.");
+       return false;
+    }
+    LOGF_DEBUG("Motor state = (%d, %d)", x, y);
+
+    char parkHomeStatus[1] = {0};
+    if (! getParkHomeStatus(parkHomeStatus))
+    {
+       LOG_ERROR("Cannot determine scope status, failed to determine park/sync state.");
+       return false;
+    }
+    LOGF_DEBUG("Mount state = %s", parkHomeStatus);
+
+    INDI::Telescope::TelescopeStatus newTrackState = TrackState;
+
+    // handle parking / unparking
+    if(strcmp(parkHomeStatus, "2") == 0)
+    {
+        newTrackState = SCOPE_PARKED;
+        if (TrackState != newTrackState)
+            SetParked(true);
+    }
+    else
+    {
+        if (TrackState == SCOPE_PARKED)
+            SetParked(false);
+
+        // handle tracking state
+        if(x==0 && y==0)
+        {
+            newTrackState = SCOPE_IDLE;
+            if (TrackState != newTrackState)
+                LOGF_INFO("%sTracking is off.", TrackState == SCOPE_PARKING ? "Scope parked. ": "");
+        }
+        else if(x==1 && y==0)
+        {
+            newTrackState = SCOPE_TRACKING;  // or GUIDING
+            if (TrackState != newTrackState)
+                LOGF_INFO("%sTracking...", TrackState == SCOPE_SLEWING ? "Slewing completed. ": "");
+        }
+    }
+
+    // Use X590 for RA DEC
     if(!sendQuery(":X590#", response))
     {
         LOGF_ERROR("Unable to get RA and DEC %s", response);
         return false;
     }
     double r, d;
-    returnCode = sscanf(response, "RD%08lf%08lf", &r, &d);
+    int returnCode = sscanf(response, "RD%08lf%08lf", &r, &d);
     if (returnCode < 2)
     {
        LOGF_ERROR("Failed to parse RA and Dec response '%s'.", response);
@@ -521,7 +526,6 @@ bool LX200StarGo::ReadScopeStatus()
     currentRA = r;
     currentDEC = d;
 
-    SetParked(TrackState==SCOPE_PARKED);
     TrackState = newTrackState;
     NewRaDec(currentRA, currentDEC);
     
@@ -577,8 +581,7 @@ bool LX200StarGo::slewToHome(ISState* states, char* names[], int n)
     //            :Z1003#
     //            p0#
     IUUpdateSwitch(&MountGotoHomeSP, states, names, n);
-    char response[AVALON_COMMAND_BUFFER_LENGTH] = {0};
-    if (!sendQuery(":X361#", response))
+    if (setMountGotoHome())
     {
         LOG_ERROR("Failed to send mount goto home command.");
         MountGotoHomeSP.s = IPS_ALERT;
@@ -605,19 +608,7 @@ bool LX200StarGo::setParkPosition(ISState* states, char* names[], int n)
     // Command  - :X352#
     // Response - 0#
     IUUpdateSwitch(&MountSetParkSP, states, names, n);
-    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
-    MountSetParkSP.s = IPS_OK;
-    if (!sendQuery(":X352#", response))
-    {
-        LOG_ERROR("Set park position command failed.");
-        MountSetParkSP.s = IPS_ALERT;
-    }
-    else if (response[0] != '0')
-    {
-        LOGF_ERROR("Invalid set park position response '%s'.", response);
-        MountSetParkSP.s = IPS_ALERT;
-    }
-
+    MountSetParkSP.s = setMountParkPosition() ? IPS_OK : IPS_ALERT;
     MountSetParkS[0].s = ISS_OFF;
     IDSetSwitch(&MountSetParkSP, nullptr);
     return true;
@@ -639,7 +630,7 @@ void LX200StarGo::getBasicData()
 
         if (genericCapability & LX200_HAS_TRACKING_FREQ)
         {
-            if (!getTrackFrequency(&TrackFreqN[0].value))
+            if (! getTrackFrequency(&TrackFreqN[0].value))
                 LOG_ERROR("Failed to get tracking frequency from device.");
             else
                 IDSetNumber(&TrackingFreqNP, nullptr);
@@ -650,11 +641,11 @@ void LX200StarGo::getBasicData()
         else
             IDSetText(&MountFirmwareInfoTP, nullptr);
 
-        bool isParked, isSynched;
-        if (getParkSync(&isParked, &isSynched))
+        char parkHomeStatus[1] = {0};
+        if (getParkHomeStatus(parkHomeStatus))
         {
-            SetParked(isParked);
-            if (isSynched)
+            SetParked(strcmp(parkHomeStatus, "2") == 0);
+            if (strcmp(parkHomeStatus, "1") == 0)
             {
 //                SyncHomeS[0].s = ISS_ON;
                 SyncHomeSP.s = IPS_OK;
@@ -720,6 +711,32 @@ void LX200StarGo::getBasicData()
     if (genericCapability & LX200_HAS_PULSE_GUIDING)
         usePulseCommand = true;   
    
+}
+
+/**************************************************************************************
+* @author CanisUrsa
+***************************************************************************************/
+bool LX200StarGo::setMountGotoHome()
+{
+    LOG_DEBUG(__FUNCTION__);
+    // Command  - :X361#
+    // Response - pA#
+    //            :Z1303#
+    //            p0#
+    //            :Z1003#
+    //            p0#
+    char response[AVALON_COMMAND_BUFFER_LENGTH] = {0};
+    if (!sendQuery(":X361#", response))
+    {
+        LOG_ERROR("Failed to send mount goto home command.");
+        return false;
+    }
+    if (strcmp(response, "pA") != 0)
+    {
+        LOGF_ERROR("Invalid mount sync goto response '%s'.", response);
+        return false;
+    }
+    return true;
 }
 
 /**************************************************************************************
@@ -879,7 +896,7 @@ bool LX200StarGo::Park()
     char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
     if (sendQuery(":X362#", response) && strcmp(response, "pB") == 0)
     {
-        LOG_INFO("Parking scope...");
+        LOG_INFO("Parking mount...");
         TrackState = SCOPE_PARKING;
         return true;
     }
@@ -899,11 +916,7 @@ bool LX200StarGo::Park()
 void LX200StarGo::SetParked(bool isparked)
 {
     LOGF_DEBUG("%s %s", __FUNCTION__, isparked?"PARKED":"UNPARKED");
-//    INDI::Telescope::SetParked(isparked);
-    ParkS[0].s = isparked ? ISS_ON : ISS_OFF;
-    ParkS[1].s = isparked ? ISS_OFF : ISS_ON;
-    ParkSP.s   = IPS_OK;
-    IDSetSwitch(&ParkSP, nullptr);
+    INDI::Telescope::SetParked(isparked);
     MountParkingStatusL[0].s = isparked ? IPS_OK : IPS_IDLE;
     MountParkingStatusL[1].s = isparked ? IPS_IDLE : IPS_OK;
     IDSetLight(&MountParkingStatusLP, nullptr);
@@ -934,7 +947,7 @@ bool LX200StarGo::UnPark()
     // and now execute unparking
     if (sendQuery(":X370#", response) && strcmp(response, "p0") == 0)
     {
-        LOG_INFO("Scope Unparked.");
+        LOG_INFO("Unparking mount...");
 /*        TrackState = SCOPE_TRACKING;
         SetParked(false);
         MountParkingStatusL[1].s = IPS_OK;
@@ -1118,6 +1131,24 @@ bool LX200StarGo::ParseMotionState(char* state)
         return false;
     }
 }
+bool LX200StarGo::setMountParkPosition()
+{
+    LOG_DEBUG(__FUNCTION__);
+    // Command  - :X352#
+    // Response - 0#
+    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+    if (!sendQuery(":X352#", response))
+    {
+        LOG_ERROR("Failed to send mount set park position command.");
+        return false;
+    }
+    if (response[0] != '0')
+    {
+        LOGF_ERROR("Invalid mount set park position response '%s'.", response);
+        return false;
+    }
+    return true;
+}
 
 /*
  * Determine the site longitude. In contrast to a standard LX200 implementation,
@@ -1168,18 +1199,54 @@ bool LX200StarGo::setSiteLatitude(double Lat)
     return (sendQuery(command, response));
 }
 
+bool LX200StarGo::getMotorStatus(int *xSpeed, int *ySpeed)
+{
+    // Command  - :X34#
+    // the StarGo replies mxy# where x is the RA / AZ motor status and y
+    // the DEC / ALT motor status meaning:
+    //    x (y) = 0 motor x (y) stopped or unpowered
+    //             (use :X3C# if you want  distinguish if stopped or unpowered)
+    //    x (y) = 1 motor x (y) returned in tracking mode
+    //    x (y) = 2 motor x (y) acelerating
+    //    x (y) = 3 motor x (y) decelerating
+    //    x (y) = 4 motor x (y) moving at low speed to refine
+    //    x (y) = 5 motor x (y) moving at high speed to target
+
+    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+    if(!sendQuery(":X34#", response))
+    {
+        LOG_ERROR("Failed to get motor state");
+        return false;
+    }
+    int x, y;
+    int returnCode = sscanf(response, "m%01d%01d", &x, &y);
+    if (returnCode < 2)
+    {
+       LOGF_ERROR("Failed to parse motor state response '%s'.", response);
+       return false;
+    }
+    *xSpeed = x;
+    *ySpeed = y;
+    LOGF_DEBUG("Motor state = (%d, %d)", *xSpeed, *ySpeed);
+    return true;
+}
+
 /**
  * @brief Check whether the mount is synched or parked.
- * @param enable if true, tracking is enabled
+ * @param status 0=unparked, 1=at home position, 2=parked
+ *               A=slewing home, B=slewing to park position
  * @return true if the command succeeded, false otherwise
  */
-bool LX200StarGo::getParkSync (bool* isParked, bool* isSynched)
+bool LX200StarGo::getParkHomeStatus (char* status)
 {
     LOG_DEBUG(__FUNCTION__);
     // Command   - :X38#
-    // Answer unparked         - p0
-    // Answer at home position - p1
-    // Answer parked           - p2
+    // Answers:
+    // p0 - unparked
+    // p1 - at home position
+    // p2 - parked
+    // pA - slewing home
+    // pB - slewing to park position
 
     char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
     if (!sendQuery(":X38#", response))
@@ -1187,19 +1254,15 @@ bool LX200StarGo::getParkSync (bool* isParked, bool* isSynched)
         LOG_ERROR("Failed to send get parking status request.");
         return false;
     }
-    int answer = 0;
-    if (! sscanf(response, "p%01d", &answer))
+
+    LOGF_DEBUG("%s: response: %s", __FUNCTION__, response);
+
+    if (! sscanf(response, "p%s[012AB]", status))
     {
-        LOGF_ERROR("Unexpected parking status response '%s'.", response);
+        LOGF_ERROR("Unexpected park home status response '%s'.", response);
         return false;
     }
 
-    switch (answer)
-    {
-    case 0: (*isParked) = false; (*isSynched) = false; break;
-    case 1: (*isParked) = false; (*isSynched) = true; break;
-    case 2: (*isParked) = true; (*isSynched) = true; break;
-    }
     return true;
 }
 
@@ -1912,7 +1975,7 @@ int LX200StarGo::SendPulseCmd(int8_t direction, uint32_t duration_msec)
 
 bool LX200StarGo::SetTrackEnabled(bool enabled)
 {
-    LOGF_INFO("%s Tracking being %s", __FUNCTION__, enabled?"enabled":"disabled");
+    LOGF_INFO("Tracking %s.", enabled?"enabled":"disabled");
 //    return querySetTracking(enabled);
     // Command tracking on  - :X122#
     //         tracking off - :X120#
