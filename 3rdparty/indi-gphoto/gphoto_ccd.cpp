@@ -129,6 +129,8 @@ void ISInit()
                 gp_list_get_name(list, cameraIndex, &model);
                 gp_list_get_value(list, cameraIndex, &port);
 
+                IDLog("Detected camera model %s on port %s\n", model, port);
+
                 cameraIndex++;
                 availableCameras--;
 
@@ -304,7 +306,7 @@ GPhotoCCD::~GPhotoCCD()
 
 const char *GPhotoCCD::getDefaultName()
 {
-    return (const char *)"GPhoto CCD";
+    return "GPhoto CCD";
 }
 
 bool GPhotoCCD::initProperties()
