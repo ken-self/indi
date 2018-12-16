@@ -45,7 +45,7 @@ ENDIF ()
 set(INDI_SOVERSION "1")
 set(CMAKE_INDI_VERSION_MAJOR 1)
 set(CMAKE_INDI_VERSION_MINOR 7)
-set(CMAKE_INDI_VERSION_RELEASE 5)
+set(CMAKE_INDI_VERSION_RELEASE 6)
 set(CMAKE_INDI_VERSION_STRING "${CMAKE_INDI_VERSION_MAJOR}.${CMAKE_INDI_VERSION_MINOR}.${CMAKE_INDI_VERSION_RELEASE}")
 set(INDI_VERSION ${CMAKE_INDI_VERSION_MAJOR}.${CMAKE_INDI_VERSION_MINOR}.${CMAKE_INDI_VERSION_RELEASE})
 
@@ -368,6 +368,7 @@ SET(indidriver_CXX_SRC
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/inditelescope.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifilterwheel.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifocuserinterface.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indiweatherinterface.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifocuser.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indirotator.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indiusbdevice.cpp
@@ -1043,7 +1044,9 @@ ENDIF ()
 #####################################
 ############ AUX GROUP ##############
 #####################################
-
+IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+    INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/drivers/auxiliary/99-indi_auxiliary.rules DESTINATION ${UDEVRULES_INSTALL_DIR})
+ENDIF ()
 ########### SkySafari Middleware ##############
 IF (INDI_BUILD_CLIENT)
     SET(skysafari_SRC
@@ -1088,9 +1091,14 @@ add_executable(indi_flipflat ${flipflat_SRC})
 target_link_libraries(indi_flipflat indidriver)
 install(TARGETS indi_flipflat RUNTIME DESTINATION bin)
 
-IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/drivers/auxiliary/99-flipflat.rules DESTINATION ${UDEVRULES_INSTALL_DIR})
-ENDIF ()
+########### Pegasus Ultimate Power Box Driver ###############
+
+SET(pegasus_upb_SRC
+    ${CMAKE_CURRENT_SOURCE_DIR}/drivers/auxiliary/pegasus_upb.cpp)
+
+add_executable(indi_pegasus_upb ${pegasus_upb_SRC})
+target_link_libraries(indi_pegasus_upb indidriver)
+install(TARGETS indi_pegasus_upb RUNTIME DESTINATION bin)
 
 ########### SnapCap Driver ###############
 
@@ -1163,10 +1171,6 @@ ENDIF ()
 add_executable(indi_gpusb ${gpusb_SRC})
 target_link_libraries(indi_gpusb indidriver)
 install(TARGETS indi_gpusb RUNTIME DESTINATION bin)
-
-IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    INSTALL(FILES ${CMAKE_CURRENT_SOURCE_DIR}/drivers/auxiliary/99-gpusb.rules DESTINATION ${UDEVRULES_INSTALL_DIR})
-ENDIF ()
 
 ########### Joystick Driver ###############
 IF (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
@@ -1409,9 +1413,9 @@ if (UNIX)
             ${CMAKE_CURRENT_SOURCE_DIR}/libs/stream/recorder/serrecorder.h
             DESTINATION ${INCLUDE_INSTALL_DIR}/libindi/stream/recorder COMPONENT Devel)
     if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
-    INSTALL(FILES            
+    INSTALL(FILES
             ${CMAKE_CURRENT_SOURCE_DIR}/libs/webcam/v4l2_decode/v4l2_decode.h
-            ${CMAKE_CURRENT_SOURCE_DIR}/libs/webcam/v4l2_decode/v4l2_builtin_decoder.h            
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs/webcam/v4l2_decode/v4l2_builtin_decoder.h
             ${CMAKE_CURRENT_SOURCE_DIR}/libs/webcam/v4l2_colorspace.h
             DESTINATION ${INCLUDE_INSTALL_DIR}/libindi COMPONENT Devel)
     ENDIF()
@@ -1467,6 +1471,7 @@ if (INDI_BUILD_DRIVERS OR INDI_BUILD_CLIENT OR INDI_BUILD_QT5_CLIENT)
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indidetector.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifilterwheel.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifocuserinterface.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indiweatherinterface.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indifocuser.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/indirotator.h
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/indibase/inditelescope.h
