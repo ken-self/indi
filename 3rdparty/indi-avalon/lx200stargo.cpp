@@ -1758,6 +1758,7 @@ bool LX200StarGo::GetMeridianFlipMode(int* index)
         return false;
     }
     if( enable == 0)
+    {
         *index = 1; // disabled
         LOG_WARN("Meridian flip DISABLED. BE CAREFUL, THIS MAY CAUSE DAMAGE TO YOUR MOUNT!");
     }
