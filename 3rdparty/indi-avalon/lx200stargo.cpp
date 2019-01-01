@@ -118,7 +118,7 @@ LX200StarGo::LX200StarGo()
     DBG_SCOPE = INDI::Logger::DBG_DEBUG;
 
     /* missing capabilities
-     * TELESCOPE_HAS_TIME: 
+     * TELESCOPE_HAS_TIME:
      *    missing commands - values can be set but not read
      *      :GG# (Get UTC offset time)
      *      :GL# (Get Local Time in 24 hour format)
@@ -143,7 +143,7 @@ LX200StarGo::LX200StarGo()
     setLX200Capability(LX200_HAS_PULSE_GUIDING );
 
     SetTelescopeCapability(TELESCOPE_CAN_PARK | TELESCOPE_CAN_SYNC | TELESCOPE_CAN_GOTO | TELESCOPE_CAN_ABORT |
-                           TELESCOPE_HAS_TRACK_MODE | TELESCOPE_HAS_LOCATION | TELESCOPE_CAN_CONTROL_TRACK | 
+                           TELESCOPE_HAS_TRACK_MODE | TELESCOPE_HAS_LOCATION | TELESCOPE_CAN_CONTROL_TRACK |
                            TELESCOPE_HAS_PIER_SIDE, 4);
 }
 
@@ -1186,7 +1186,7 @@ bool LX200StarGo::getScopeAlignmentStatus(char *mountType, bool *isTracking, int
         LOG_ERROR("Error communication with telescope.");
         return false;
     }
-    
+
     char mt, tracking;
     int nr;
     int returnCode = sscanf(response, "%c%c%01d", &mt, &tracking, &nr);
@@ -1705,10 +1705,10 @@ bool LX200StarGo::SetMeridianFlipMode(int index)
         LOGF_ERROR("Invalid Meridian Flip Mode %d", index);
         return false;
     }
-    const char* enablecmd = index==1 ? ":TTRFs#" : ":TTSFs#";
+    const char* disablecmd = index==1 ? ":TTSFs#" : ":TTRFs#";
     const char* forcecmd  = index==2 ? ":TTSFd#" : ":TTRFd#";
     char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
-    if(!sendQuery(enablecmd, response) || !sendQuery(forcecmd, response))
+    if(!sendQuery(disablecmd, response) || !sendQuery(forcecmd, response))
     {
         LOGF_ERROR("Cannot set Meridian Flip Mode %d", index);
         return false;
@@ -1736,19 +1736,19 @@ bool LX200StarGo::GetMeridianFlipMode(int* index)
 // 0: Auto mode: Enabled and not Forced
 // 1: Disabled mode: Disabled and not Forced
 // 2: Forced mode: Enabled and Forced
-    const char* enablecmd = ":TTGFs#";
+    const char* disablecmd = ":TTGFs#";
     const char* forcecmd  = ":TTGFd#";
-    char enableresp[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+    char disableresp[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
     char forceresp[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
-    if(!sendQuery(enablecmd, enableresp) || !sendQuery(forcecmd, forceresp))
+    if(!sendQuery(disablecmd, disableresp) || !sendQuery(forcecmd, forceresp))
     {
-        LOGF_ERROR("Cannot get Meridian Flip Mode %s %s", enableresp, forceresp);
+        LOGF_ERROR("Cannot get Meridian Flip Mode %s %s", disableresp, forceresp);
         return false;
     }
-    int enable = 0;
-    if (! sscanf(enableresp, "vs%01d", &enable))
+    int disable = 0;
+    if (! sscanf(disableresp, "vs%01d", &disable))
     {
-        LOGF_ERROR("Invalid meridian flip enabled response '%s", enableresp);
+        LOGF_ERROR("Invalid meridian flip disabled response '%s", disableresp);
         return false;
     }
     int force = 0;
@@ -1757,7 +1757,7 @@ bool LX200StarGo::GetMeridianFlipMode(int* index)
         LOGF_ERROR("Invalid meridian flip forced response '%s", forceresp);
         return false;
     }
-    if( enable == 0)
+    if( disable == 1)
     {
         *index = 1; // disabled
         LOG_WARN("Meridian flip DISABLED. BE CAREFUL, THIS MAY CAUSE DAMAGE TO YOUR MOUNT!");
