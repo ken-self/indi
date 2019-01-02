@@ -162,7 +162,11 @@ const char *LX200StarGo::getDefaultName()
 bool LX200StarGo::Handshake()
 {
     char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
-    if(!sendQuery(":GW#", response))
+    char mountType;
+    bool isTracking;
+    int alignmentPoints;
+
+    if(!getScopeAlignmentStatus(&mountType, &isTracking, &alignmentPoints))
     {
         LOG_ERROR("Error communication with telescope.");
         return false;
