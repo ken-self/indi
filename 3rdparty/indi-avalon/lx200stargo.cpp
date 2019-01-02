@@ -478,6 +478,12 @@ bool LX200StarGo::ReadScopeStatus()
             newTrackState = SCOPE_IDLE;
             if (TrackState != newTrackState)
                 LOGF_INFO("%sTracking is off.", TrackState == SCOPE_PARKING ? "Scope parked. ": "");
+
+            if (MountGotoHomeSP.s == IPS_BUSY)
+            {
+                MountGotoHomeSP.s = IPS_OK;
+                IDSetSwitch(&MountGotoHomeSP, nullptr);
+            }
         }
         else if(x==1 && y==0)
         {
