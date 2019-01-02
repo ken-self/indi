@@ -171,9 +171,9 @@ bool LX200StarGo::Handshake()
         LOG_ERROR("Error communication with telescope.");
         return false;
     }
-    if (strcmp(response, "PT0"))
+    if (isTracking)
     {
-        LOGF_ERROR("Unexpected response %s", response);
+        LOG_ERROR("Mount is tracking - cannot handshake");
         return false;
     }
     char cmdsync[32];
@@ -441,7 +441,6 @@ bool LX200StarGo::ReadScopeStatus()
         return true;
     }
 
-    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
     int x, y;
 
     if (! getMotorStatus(&x, &y))
@@ -488,21 +487,12 @@ bool LX200StarGo::ReadScopeStatus()
         }
     }
 
-    // Use X590 for RA DEC
-    if(!sendQuery(":X590#", response))
-    {
-        LOGF_ERROR("Unable to get RA and DEC %s", response);
-        return false;
-    }
     double r, d;
-    int returnCode = sscanf(response, "RD%08lf%08lf", &r, &d);
-    if (returnCode < 2)
+    if(!getEqCoordinates(&r, &d))
     {
-        LOGF_ERROR("Failed to parse RA and Dec response '%s'.", response);
+        LOG_ERROR("Retrieving equatorial coordinates failed.");
         return false;
     }
-    r /= 1.0e6;
-    d /= 1.0e5;
     currentRA = r;
     currentDEC = d;
 
