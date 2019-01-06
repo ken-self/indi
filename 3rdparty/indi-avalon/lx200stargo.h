@@ -24,7 +24,9 @@
 
 #pragma once
 
-#include <mounts/lx200telescope.h>
+#include <indiguiderinterface.h>
+#include <inditelescope.h>
+
 #include <indicom.h>
 #include <indilogger.h>
 #include <termios.h>
@@ -38,6 +40,8 @@
 #define AVALON_TIMEOUT                                  2
 #define AVALON_COMMAND_BUFFER_LENGTH                    32
 #define AVALON_RESPONSE_BUFFER_LENGTH                   32
+#define LX200_GENERIC_SLEWRATE 5        /* slew rate, degrees/s */
+
 
 enum TDirection
 {
@@ -47,24 +51,11 @@ enum TDirection
     LX200_SOUTH,
     LX200_ALL
 };
-enum TSlew
-{
-    LX200_SLEW_MAX,
-    LX200_SLEW_FIND,
-    LX200_SLEW_CENTER,
-    LX200_SLEW_GUIDE
-};
-enum TFormat
-{
-    LX200_SHORT_FORMAT,
-    LX200_LONG_FORMAT,
-    LX200_LONGER_FORMAT
-};
 
 // StarGo specific tabs
 extern const char *RA_DEC_TAB;
 
-class LX200StarGo : public LX200Telescope
+class LX200StarGo : public INDI::Telescope, public INDI::GuiderInterface
 {
 public:
     enum TrackMode
@@ -88,19 +79,14 @@ public:
     LX200StarGo();
 
     virtual const char *getDefaultName() override;
-    virtual bool Handshake() override;
-    virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
+
     virtual bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n) override;
-    virtual bool updateProperties() override;
-    virtual bool initProperties() override;
+    virtual bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n) override;
     virtual void ISGetProperties(const char *dev)override;
 
-    // helper functions
-    virtual bool receive(char* buffer, int* bytes, int wait=AVALON_TIMEOUT);
-    virtual bool receive(char* buffer, int* bytes, char end, int wait=AVALON_TIMEOUT);
-    virtual void flush();
-    virtual bool transmit(const char* buffer);
-    virtual bool SetTrackMode(uint8_t mode) override;
+    virtual bool initProperties() override;
+    virtual bool updateProperties() override;
+    virtual bool Handshake() override;
 
 protected:
 
@@ -119,8 +105,6 @@ protected:
     // parking position
     ISwitchVectorProperty MountSetParkSP;
     ISwitch MountSetParkS[1];
-    ILightVectorProperty MountParkingStatusLP;
-    ILight MountParkingStatusL[2];
 
     // guiding
     INumberVectorProperty GuidingSpeedNP;
@@ -133,95 +117,104 @@ protected:
     ISwitchVectorProperty MeridianFlipModeSP;
     ISwitch MeridianFlipModeS[3];
 
-    ISwitchVectorProperty MeridianFlipEnabledSP;
-    ISwitch MeridianFlipEnabledS[2];
-    ISwitchVectorProperty MeridianFlipForcedSP;
-    ISwitch MeridianFlipForcedS[2];
+ /* Use pulse-guide commands */
+    ISwitchVectorProperty UsePulseCmdSP;
+    ISwitch UsePulseCmdS[2];
+    bool usePulseCommand { false };
 
-    int controller_format;
+    bool sendTimeOnStartup=true, sendLocationOnStartup=true;
+    uint8_t DBG_SCOPE;
 
-    // override LX200Generic
-    virtual void getBasicData() override;
+    double targetRA, targetDEC;
+    double currentRA, currentDEC;
+
     virtual bool ReadScopeStatus() override;
-    virtual bool Park() override;
-    virtual void SetParked(bool isparked);
-    virtual bool UnPark() override;
-    virtual bool saveConfigItems(FILE *fp) override;
     virtual bool Goto(double ra, double dec) override;
-
-    // StarGo stuff
-    virtual bool syncHomePosition();
-    bool slewToHome(ISState *states, char *names[], int n);
-    bool setParkPosition(ISState *states, char *names[], int n);
-
-    // autoguiding
-    virtual bool setGuidingSpeeds(int raSpeed, int decSpeed);
-
-    // scope status
-    virtual bool ParseMotionState(char* state);
-
-    // location
-    virtual bool sendScopeLocation();
-    double LocalSiderealTime(double longitude);
-    bool setLocalSiderealTime(double longitude);
-    virtual bool updateLocation(double latitude, double longitude, double elevation) override;
-    virtual bool getSiteLatitude(double *siteLat);
-    virtual bool getSiteLongitude(double *siteLong);
-    virtual bool getLST_String(char* input);
-    bool getTrackFrequency(double *value);
-    virtual bool getEqCoordinates(double *ra, double *dec);
-
-
-    // queries to the scope interface. Wait for specified end character
-    virtual bool sendQuery(const char* cmd, char* response, char end, int wait=AVALON_TIMEOUT);
-    // Wait for default "#' character
-    virtual bool sendQuery(const char* cmd, char* response, int wait=AVALON_TIMEOUT);
-    virtual bool getFirmwareInfo(char *version);
-    virtual bool setSiteLatitude(double Lat);
-    virtual bool setSiteLongitude(double Long);
-    virtual bool getScopeAlignmentStatus(char *mountType, bool *isTracking, int *alignmentPoints);
-    virtual bool getMotorStatus(int *xSpeed, int *ySpeed);
-    virtual bool getParkHomeStatus (char* status);
-    virtual bool setMountGotoHome();
-    virtual bool setMountParkPosition();
-
-    // guiding
-    virtual bool getST4Status(bool *isEnabled);
-    virtual bool getGuidingSpeeds(int *raSpeed, int *decSpeed);
-    virtual bool setST4Enabled(bool enabled);
-
-    // meridian flip
-
-    virtual bool syncSideOfPier();
-    bool checkLX200Format();
-    // Guide Commands
-    virtual IPState GuideNorth(uint32_t ms) override;
-    virtual IPState GuideSouth(uint32_t ms) override;
-    virtual IPState GuideEast(uint32_t ms) override;
-    virtual IPState GuideWest(uint32_t ms) override;
-    virtual bool SetSlewRate(int index) override;
-    virtual bool SetMeridianFlipMode(int index);
-    virtual bool GetMeridianFlipMode(int *index);
-    virtual int SendPulseCmd(int8_t direction, uint32_t duration_msec) override;
-    virtual bool SetTrackEnabled(bool enabled) override;
-    virtual bool SetTrackRate(double raRate, double deRate) override;
-    // NSWE Motion Commands
+    virtual bool Sync(double ra, double dec) override;
     virtual bool MoveNS(INDI_DIR_NS dir, TelescopeMotionCommand command) override;
     virtual bool MoveWE(INDI_DIR_WE dir, TelescopeMotionCommand command) override;
-    virtual bool Sync(double ra, double dec) override;
-    bool setObjectCoords(double ra, double dec);
-    virtual bool setLocalDate(uint8_t days, uint8_t months, uint16_t years) override;
-    virtual bool setLocalTime24(uint8_t hour, uint8_t minute, uint8_t second) override;
-    virtual bool setUTCOffset(double offset) override;
-    virtual bool getLocalTime(char *timeString) override;
-    virtual bool getLocalDate(char *dateString) override;
-    virtual bool getUTFOffset(double *offset) override;
-
-    // Abort ALL motion
+    virtual bool Park() override;
+    virtual bool UnPark() override;
     virtual bool Abort() override;
-    int MoveTo(int direction);
+    virtual bool SetTrackMode(uint8_t mode) override;
+    virtual bool SetTrackRate(double raRate, double deRate) override;
+    virtual bool SetTrackEnabled(bool enabled) override;
+//    virtual bool updateTime(ln_date *utc, double utc_offset);
+    virtual bool updateLocation(double latitude, double longitude, double elevation) override;
+    virtual bool SetSlewRate(int index) override;
 
+    virtual bool saveConfigItems(FILE *fp) override;
+
+    virtual IPState GuideNorth(uint32_t ms);
+    virtual IPState GuideSouth(uint32_t ms);
+    virtual IPState GuideEast(uint32_t ms);
+    virtual IPState GuideWest(uint32_t ms);
+
+//    virtual bool SetParkPosition(double Axis1Value, double Axis2Value);
+    virtual bool SetCurrentPark();
+//    virtual bool SetDefaultPark();
+
+    // StarGo stuff
+    bool setHomeSync();
+    bool setParkPosition();
+    bool setGotoHome();
+    bool getParkHomeStatus (char* status);
+
+    bool getScopeAlignmentStatus(char *mountType, bool *isTracking, int *alignmentPoints);
     bool setSlewMode(int slewMode);
+    bool setObjectCoords(double ra, double dec);
+    bool getEqCoordinates(double *ra, double *dec);
+
+    // autoguiding
+    bool setGuidingSpeeds(int raSpeed, int decSpeed);
+    bool getGuidingSpeeds(int *raSpeed, int *decSpeed);
+    bool setST4Enabled(bool enabled);
+    bool getST4Status(bool *isEnabled);
+    int SendPulseCmd(int8_t direction, uint32_t duration_msec) ;
+
+    // location
+    bool sendScopeLocation();
+    bool getSiteLatitude(double *siteLat);
+    bool getSiteLongitude(double *siteLong);
+    bool setSiteLatitude(double Lat);
+    bool setSiteLongitude(double Long);
+
+    bool setLocalSiderealTime(double longitude);
+    bool setLocalDate(uint8_t days, uint8_t months, uint16_t years) ;
+    bool setLocalTime24(uint8_t hour, uint8_t minute, uint8_t second) ;
+    bool setUTCOffset(double offset) ;
+    bool getLST_String(char* input);
+    bool getLocalDate(char *dateString) ;
+    bool getLocalTime(char *timeString) ;
+    bool getUTCOffset(double *offset) ;
+    bool sendScopeTime();
+
+    // meridian flip
+    bool SetMeridianFlipMode(int index);
+    bool GetMeridianFlipMode(int *index);
+
+    // scope status
+    void getBasicData();
+    bool getFirmwareInfo(char *version);
+    bool getMotorStatus(int *xSpeed, int *ySpeed);
+    bool getSideOfPier();
+
+// Simulate Mount in simulation mode
+    void mountSim();
+
+    // queries to the scope interface. Wait for specified end character
+    bool sendQuery(const char* cmd, char* response, char end, int wait=AVALON_TIMEOUT);
+    // Wait for default "#' character
+    bool sendQuery(const char* cmd, char* response, int wait=AVALON_TIMEOUT);
+    bool ParseMotionState(char* state);
+
+
+    // helper functions
+public:
+    bool receive(char* buffer, int* bytes, int wait=AVALON_TIMEOUT);
+    bool receive(char* buffer, int* bytes, char end, int wait=AVALON_TIMEOUT);
+    void flush();
+    bool transmit(const char* buffer);
 
 };
 inline bool LX200StarGo::sendQuery(const char* cmd, char* response, int wait)

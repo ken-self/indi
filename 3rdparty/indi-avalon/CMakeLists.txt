@@ -33,7 +33,8 @@ SET(lx200stargo_SRCS
     )
 
 add_executable(indi_lx200stargo ${lx200stargo_SRCS})
-target_link_libraries(indi_lx200stargo indilx200 ${INDI_LIBRARIES} ${NOVA_LIBRARIES})
+#target_link_libraries(indi_lx200stargo indilx200 ${INDI_LIBRARIES} ${NOVA_LIBRARIES})
+target_link_libraries(indi_lx200stargo ${INDI_LIBRARIES} ${NOVA_LIBRARIES})
 
 install(TARGETS indi_lx200stargo RUNTIME DESTINATION bin )
 
