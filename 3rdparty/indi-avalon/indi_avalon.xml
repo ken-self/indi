@@ -3,7 +3,7 @@
 <devGroup group="Telescopes">
     <device label="Avalon StarGo" manufacturer="Avalon">
         <driver name="Avalon StarGo">indi_stargo</driver>
-        <version>@AVALON_VERSION_MAJOR@.@AVALON_VERSION_MINOR@</version>
+        <version>1.0</version>
     </device>
 </devGroup>
 </driversList>

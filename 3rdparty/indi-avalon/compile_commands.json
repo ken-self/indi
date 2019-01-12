@@ -1,0 +1,12 @@
+[
+{
+  "directory": "/home/ken/indi/3rdparty/indi-avalon",
+  "command": "/usr/bin/g++    -I/home/ken/indi/3rdparty/indi-avalon -I/usr/include/libindi -I/usr/include/libnova   -std=c++11 -D_FORTIFY_SOURCE=2 -fstack-protector-all -fPIE -Wa,--noexecstack  -Wall -Wextra -Wno-unused-but-set-variable -g -g3 -gdwarf-2   -o CMakeFiles/indi_stargo.dir/stargo.cpp.o -c /home/ken/indi/3rdparty/indi-avalon/stargo.cpp",
+  "file": "/home/ken/indi/3rdparty/indi-avalon/stargo.cpp"
+},
+{
+  "directory": "/home/ken/indi/3rdparty/indi-avalon",
+  "command": "/usr/bin/g++    -I/home/ken/indi/3rdparty/indi-avalon -I/usr/include/libindi -I/usr/include/libnova   -std=c++11 -D_FORTIFY_SOURCE=2 -fstack-protector-all -fPIE -Wa,--noexecstack  -Wall -Wextra -Wno-unused-but-set-variable -g -g3 -gdwarf-2   -o CMakeFiles/indi_stargo.dir/stargofocuser.cpp.o -c /home/ken/indi/3rdparty/indi-avalon/stargofocuser.cpp",
+  "file": "/home/ken/indi/3rdparty/indi-avalon/stargofocuser.cpp"
+}
+]
