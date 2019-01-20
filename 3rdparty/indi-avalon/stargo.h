@@ -119,9 +119,9 @@ protected:
     ISwitch MeridianFlipModeS[3];
 
  /* Use pulse-guide commands */
-    ISwitchVectorProperty UsePulseCmdSP;
-    ISwitch UsePulseCmdS[2];
-    bool usePulseCommand { false };
+//    ISwitchVectorProperty UsePulseCmdSP;
+//    ISwitch UsePulseCmdS[2];
+    bool usePulseCommand { true };
 
     bool sendTimeOnStartup=true, sendLocationOnStartup=true;
     uint8_t DBG_SCOPE;
