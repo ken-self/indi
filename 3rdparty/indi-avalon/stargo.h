@@ -128,6 +128,8 @@ protected:
 
     double targetRA, targetDEC;
     double currentRA, currentDEC;
+    
+    bool ParkOptionBusy { false };
 
     virtual bool ReadScopeStatus() override;
     virtual bool Goto(double ra, double dec) override;
@@ -152,11 +154,12 @@ protected:
     virtual IPState GuideWest(uint32_t ms) override;
 //    virtual void GuideComplete(INDI_EQ_AXIS axis) override;
 
-//    virtual bool SetParkPosition(double Axis1Value, double Axis2Value);
-    virtual bool SetCurrentPark();
-//    virtual bool SetDefaultPark();
+    virtual bool SetParkPosition(double Axis1Value, double Axis2Value) override;
+    virtual bool SetCurrentPark() override;
+    virtual bool SetDefaultPark() override;
 
     // StarGo stuff
+    void WaitParkOptionReady();
     bool isGuiding();
     bool setHomeSync();
     bool setParkPosition();

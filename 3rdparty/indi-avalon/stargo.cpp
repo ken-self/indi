@@ -464,7 +464,7 @@ bool StarGoTelescope::ReadScopeStatus()
         mountSim();
         return true;
     }
-    
+
     int x, y;
     if (! getMotorStatus(&x, &y))
     {
@@ -528,6 +528,8 @@ bool StarGoTelescope::ReadScopeStatus()
 
     TrackState = newTrackState;
     NewRaDec(currentRA, currentDEC);
+
+    WaitParkOptionReady();
 
     return getSideOfPier();
 }
@@ -737,6 +739,7 @@ bool StarGoTelescope::Abort()
 {
     LOG_DEBUG(__FUNCTION__);
     char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+    ParkOptionBusy = false;
     if (!isSimulation() && !sendQuery(":Q#", response, 0))
     {
         LOG_ERROR("Failed to abort slew.");
@@ -963,24 +966,89 @@ IPState StarGoTelescope::GuideWest(uint32_t ms)
 /*******************************************************************************
 ** overloads virtual SetCurrentPark
 *******************************************************************************/
+bool StarGoTelescope::SetParkPosition(double Axis1Value, double Axis2Value)
+{
+    INDI_UNUSED(Axis1Value);
+    INDI_UNUSED(Axis2Value);
+
+// Convert HA/Dec to RA/Dec
+    double longitude;
+    if (!getSiteLongitude(&longitude))
+    {
+        LOG_WARN("Failed to get site Longitude from device.");
+        return false;
+    }
+    // determine local sidereal time
+    double lst = get_local_sidereal_time(longitude);
+
+    if(!Goto(lst - Axis1Value, Axis2Value)) return false;
+    return SetCurrentPark();
+}
+
+bool StarGoTelescope::SetDefaultPark()
+{
+    LOG_DEBUG(__FUNCTION__);
+
+    double latitude;
+    if (!getSiteLatitude(&latitude))
+    {
+        LOG_WARN("getLST Failed to get site Latitude from device.");
+        return false;
+    }
+
+    if(!setGotoHome()) return false;
+    return SetCurrentPark();
+}
+
 bool StarGoTelescope::SetCurrentPark()
 {
     LOG_DEBUG(__FUNCTION__);
-    // Command  - :X352#
-    // Response - 0#
-    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
-    if (!sendQuery(":X352#", response))
-    {
-        LOG_ERROR("Failed to send mount set park position command.");
-        return false;
-    }
-    if (response[0] != '0')
-    {
-        LOGF_ERROR("Invalid mount set park position response '%s'.", response);
-        return false;
-    }
+
+    ParkOptionBusy = true;
+    WaitParkOptionReady();
     return true;
 }
+
+void StarGoTelescope::WaitParkOptionReady()
+{
+    // Check if waiting for park position to set. Reset in Abort())
+    if(!ParkOptionBusy) return;
+
+    // Check if the mount has stopped slewing
+//        SCOPE_IDLE        ready
+//        SCOPE_SLEWING -   not ready
+//        SCOPE_TRACKING    ready
+//        SCOPE_PARKING     not ready - error
+//        SCOPE_PARKED      not ready error
+// If it has then set park position. Otherwise wait for next call
+    if(TrackState != SCOPE_IDLE &&
+       TrackState != SCOPE_TRACKING ) return;
+
+    double longitude;
+    bool rc = setParkPosition();
+    ParkOptionSP.s = IPS_ALERT;
+    if(!rc)
+    {
+        LOG_WARN("Unable to set Park Position.");
+    }
+    else if (!getSiteLongitude(&longitude))
+    {
+        LOG_WARN("Failed to get site Longitude from device.");
+    }
+    else
+    {
+    // determine local sidereal time
+        double lst = get_local_sidereal_time(longitude);
+        SetAxis1Park(lst - EqN[AXIS_RA].value);
+        SetAxis2Park(EqN[AXIS_DE].value);
+        ParkOptionSP.s = IPS_OK;
+    }
+    IDSetSwitch(&ParkOptionSP, nullptr);
+    ParkOptionBusy = false;
+    return;
+}
+
+
 /*******************************************************************************
 **
 ** STARGO methods
@@ -1401,7 +1469,7 @@ int StarGoTelescope::SendPulseCmd(int8_t direction, uint32_t duration_msec)
         LOG_ERROR("Failed to send guide pulse request.");
         return false;
     }
-// Assume the guide pulse was issued and acted upon. 
+// Assume the guide pulse was issued and acted upon.
     return true;
 }
 
@@ -1827,7 +1895,7 @@ bool StarGoTelescope::SetMeridianFlipMode(int index)
     // 0: Auto mode: Enabled and not Forced
     // 1: Disabled mode: Disabled and not Forced
     // 2: Forced mode: Enabled and Forced
- 
+
     if (isSimulation())
     {
         MeridianFlipModeSP.s = IPS_OK;
