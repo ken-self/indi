@@ -150,8 +150,8 @@ bool StarGoTelescope::ISNewNumber(const char *dev, const char *name, double valu
 
             if(result)
             {
-                GuidingSpeedP[0].value = static_cast<double>(raSpeed) / 100.0;
-                GuidingSpeedP[1].value = static_cast<double>(decSpeed) / 100.0;
+                GuidingSpeedN[0].value = static_cast<double>(raSpeed) / 100.0;
+                GuidingSpeedN[1].value = static_cast<double>(decSpeed) / 100.0;
                 GuidingSpeedNP.s = IPS_OK;
             }
             else
@@ -325,12 +325,29 @@ bool StarGoTelescope::initProperties()
                        IP_RW, ISR_ATMOST1, 60, IPS_IDLE);
 
     IUFillText(&MountFirmwareInfoT[0], "MOUNT_FIRMWARE_INFO", "Firmware", "");
-    IUFillTextVector(&MountFirmwareInfoTP, MountFirmwareInfoT, 1, getDeviceName(), "MOUNT_INFO", "Mount Info", INFO_TAB, IP_RO, 60, IPS_OK);
+    IUFillText(&MountFirmwareInfoT[1], "MOUNT_TYPE", "Mount Type", "");
+    IUFillText(&MountFirmwareInfoT[2], "MOUNT_TCB", "TCB", "");
+    IUFillTextVector(&MountFirmwareInfoTP, MountFirmwareInfoT, 3, getDeviceName(), "MOUNT_INFO", "Mount Info", INFO_TAB, IP_RO, 60, IPS_OK);
+
+    // Gear Ratios
+    IUFillNumber(&GearRatioN[0], "GEAR_RATIO_RA", "RA Gearing", "%.2f", 0.0, 1000.0, 1, 0);
+    IUFillNumber(&GearRatioN[1], "GEAR_RATIO_DEC", "DEC Gearing", "%.2f", 0.0, 1000.0, 1, 0);
+    IUFillNumberVector(&GearRatioNP, GearRatioN, 2, getDeviceName(), "Gear Ratio","Gearing", INFO_TAB, IP_RO, 60, IPS_IDLE);
+
+    // Max Slew Speeds
+    IUFillNumber(&MaxSlewN[0], "MAX_SLEW_RA", "RA Max Slew", "%.2f", 0.0, 100.0, 1, 0);
+    IUFillNumber(&MaxSlewN[1], "MAX_SLEW__DEC", "DEC Max Slew", "%.2f", 0.0, 100.0, 1, 0);
+    IUFillNumberVector(&MaxSlewNP, MaxSlewN, 2, getDeviceName(), "Max Slew","Slewing", INFO_TAB, IP_RO, 60, IPS_IDLE);
+
+    // Motor Step Position
+    IUFillNumber(&MotorStepN[0], "MOTOR_STEP_RA", "RA Step Pos", "%.2f", -100000.0, 100000.0, 1, 0);
+    IUFillNumber(&MotorStepN[1], "MOTOR_STEP_DEC", "DEC Step Pos", "%.2f", -100000.0, 100000.0, 1, 0);
+    IUFillNumberVector(&MotorStepNP, MotorStepN, 2, getDeviceName(), "Motor Steps","Position", INFO_TAB, IP_RO, 60, IPS_IDLE);
 
     // Guiding settings
-    IUFillNumber(&GuidingSpeedP[0], "GUIDING_SPEED_RA", "RA Speed", "%.2f", 0.0, 2.0, 0.1, 0);
-    IUFillNumber(&GuidingSpeedP[1], "GUIDING_SPEED_DEC", "DEC Speed", "%.2f", 0.0, 2.0, 0.1, 0);
-    IUFillNumberVector(&GuidingSpeedNP, GuidingSpeedP, 2, getDeviceName(), "GUIDING_SPEED","Autoguiding", RA_DEC_TAB, IP_RW, 60, IPS_IDLE);
+    IUFillNumber(&GuidingSpeedN[0], "GUIDING_SPEED_RA", "RA Speed", "%.2f", 0.0, 2.0, 0.1, 0);
+    IUFillNumber(&GuidingSpeedN[1], "GUIDING_SPEED_DEC", "DEC Speed", "%.2f", 0.0, 2.0, 0.1, 0);
+    IUFillNumberVector(&GuidingSpeedNP, GuidingSpeedN, 2, getDeviceName(), "GUIDING_SPEED","Autoguiding", RA_DEC_TAB, IP_RW, 60, IPS_IDLE);
 
     IUFillSwitch(&ST4StatusS[0], "ST4_DISABLED", "disabled", ISS_OFF);
     IUFillSwitch(&ST4StatusS[1], "ST4_ENABLED", "enabled", ISS_OFF);
@@ -342,7 +359,40 @@ bool StarGoTelescope::initProperties()
     IUFillSwitch(&MeridianFlipModeS[2], "MERIDIAN_FLIP_FORCED", "forced", ISS_OFF);
     IUFillSwitchVector(&MeridianFlipModeSP, MeridianFlipModeS, 3, getDeviceName(), "MERIDIAN_FLIP_MODE", "Meridian Flip", RA_DEC_TAB, IP_RW, ISR_ATMOST1, 60, IPS_IDLE);
 
-//    focuser->initProperties("AUX1 Focuser");
+/*
+ EXTRA COMMANDS
+ *
+ * Set centre and find speeds
+ * X03aaaabbbb aaaa=center speed; bbbb=findspeed
+ * valid center speeds:
+2  = 007:  = 0x7a = 122
+3  = 0051  = 0x51 = 81
+4  = 003=  = 0x3d = 61
+6  = 0028  = 0x28 = 40
+8  = 001>  = 0x1e = 40
+10 = 0018  = 0x18 = 24
+
+valid find speeds:
+10  = 0031  = x31 = 49
+15  = 0020  = x20 = 32
+20  = 0018  = x18 = 24
+30  = 0010  = x10 = 16
+50  = 000:  = x0a = 10
+75  = 0006  = x06 = 6
+100 = 0005  = x05 = 5
+150 = 0003  = x03 = 3
+
+Convert to Hex using ASCII-48 (ASCII-x30)
+
+ * Reverse RA/DEC
+ * Reverse RA X1A0; DEC X1A1
+ * Get X1B => wrd where r=RA; d=DEC
+ *
+ * Set tracking rate
+ * X1Ennnn where nnnn=0500 to 1500; 1000 is base rate
+ *
+ */
+    //    focuser->initProperties("AUX1 Focuser");
 
     return true;
 }
@@ -370,6 +420,10 @@ bool StarGoTelescope::updateProperties()
         defineSwitch(&ST4StatusSP);
         defineSwitch(&MeridianFlipModeSP);
         defineText(&MountFirmwareInfoTP);
+        defineNumber(&GearRatioNP);
+        defineNumber(&MaxSlewNP);
+        defineNumber(&MotorStepNP);
+
         getBasicData();
     }
     else
@@ -384,6 +438,9 @@ bool StarGoTelescope::updateProperties()
         deleteProperty(ST4StatusSP.name);
         deleteProperty(MeridianFlipModeSP.name);
         deleteProperty(MountFirmwareInfoTP.name);
+        deleteProperty(GearRatioNP.name);
+        deleteProperty(MaxSlewNP.name);
+        deleteProperty(MotorStepNP.name);
     }
 
 //    focuser->updateProperties();
@@ -516,6 +573,19 @@ bool StarGoTelescope::ReadScopeStatus()
                 LOGF_INFO("%sTracking...", TrackState == SCOPE_SLEWING ? "Slewing completed. ": "");
         }
     }
+
+    double raStep, decStep;
+    if (getMotorSteps(&raStep, &decStep))
+    {
+        MotorStepN[0].value =  raStep;
+        MotorStepN[1].value =  decStep;
+        MotorStepNP.s = IPS_OK;
+    }
+    else
+    {
+        MotorStepNP.s = IPS_ALERT;
+    }
+    IDSetNumber(&MotorStepNP, nullptr);
 
     double r, d;
     if(!getEqCoordinates(&r, &d))
@@ -1343,6 +1413,102 @@ bool StarGoTelescope::setGuidingSpeeds (int raSpeed, int decSpeed)
 }
 
 /*******************************************************************************
+ * @brief Determine the gear ratios for RA and DEC axis
+ * @param raRatio for RA axis
+ * @param decRatio for DEC axis
+ * @return
+*******************************************************************************/
+bool StarGoTelescope::getGearRatios(int *raRatio, int *decRatio)
+{
+    LOG_DEBUG(__FUNCTION__);
+    // Command query gear ratios  - :X480# and :X481#
+    //         response              - innnnnnnn#
+    //         nnnnnnnn Avalon hex
+
+    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+    if (!sendQuery(":X480#", response))
+    {
+        LOG_ERROR("Failed to send get RA gear ratiorequest.");
+        return false;
+    }
+    *raRatio = ahex2int(&response[2]);
+    if (!sendQuery(":X481#", response))
+    {
+        LOG_ERROR("Failed to send get DEC gear ratiorequest.");
+        return false;
+    }
+    *decRatio = ahex2int(&response[2]);
+
+    return true;
+}
+
+/*******************************************************************************
+ * @brief Determine the max slew rates for RA and DEC axis
+ * @param raSlew max slew for RA axis
+ * @param decSlew max slew for DEC axis
+ * @return
+*******************************************************************************/
+bool StarGoTelescope::getMaxSlews(int *raSlew, int *decSlew)
+{
+    LOG_DEBUG(__FUNCTION__);
+    // Command query max slew rates  - :TTGMX#
+    //         response              - xxayy#
+    //         xx RA; yy DEC
+
+    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+    if (!sendQuery(":TTGMX#", response))
+    {
+        LOG_ERROR("Failed to send get RAmax slew rates request.");
+        return false;
+    }
+    if (! sscanf(response, "%02da%2d", raSlew, decSlew))
+    {
+        LOGF_ERROR("Unexpected max slew response '%s'.", response);
+        return false;
+    }
+
+    return true;
+}
+
+/*******************************************************************************
+ * @brief Determine the motor position for RA and DEC axis
+ * @param raSteps position for RA axis
+ * @param decSteps position for DEC axis
+ * @return
+*******************************************************************************/
+bool StarGoTelescope::getMotorSteps(double *raSteps, double *decSteps)
+{
+    LOG_DEBUG(__FUNCTION__);
+    // Command query motor step pos  - :TTGMs0# and :TTGMs1#
+    //         response              - xxxxxxxxr; yyyyyyyyd#
+    //         nnnnnnnn Avalon hex
+
+    char response[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+    const double hi=std::pow(2.0,31);
+    const double fi=std::pow(2.0,32);
+    if (!sendQuery(":TTGMs0#", response))
+    {
+        LOG_ERROR("Failed to send get RA motor step pos request.");
+        return false;
+    }
+    response[8] = '\0';
+    *raSteps = ahex2int(response);
+    LOGF_DEBUG("%s RA pos %s %lf", __FUNCTION__, response, *raSteps);
+    *raSteps = *raSteps<=hi? *raSteps: (*raSteps - fi);
+    if (!sendQuery(":TTGMs1#", response))
+    {
+        LOG_ERROR("Failed to send get DEC motor steps request.");
+        return false;
+    }
+    response[8] = '\0';
+    *decSteps = ahex2int(response);
+    LOGF_DEBUG("%s DEC pos %s %lf", __FUNCTION__, response, *decSteps);
+    *decSteps = *decSteps<=hi? *decSteps: (*decSteps - fi);
+
+    return true;
+}
+
+/*******************************************************************************
  * @brief Determine the guiding speeds for RA and DEC axis
  * @param raSpeed percentage for RA axis
  * @param decSpeed percenage for DEC axis
@@ -1991,7 +2157,11 @@ void StarGoTelescope::getBasicData()
     if (!isSimulation())
     {
         MountFirmwareInfoT[0].text = new char[64];
-        if (!getFirmwareInfo(MountFirmwareInfoT[0].text))
+        MountFirmwareInfoT[1].text = new char[64];
+        MountFirmwareInfoT[2].text = new char[64];
+        if (!getFirmwareInfo(MountFirmwareInfoT[0].text,
+                MountFirmwareInfoT[1].text,
+                MountFirmwareInfoT[2].text ))
             LOG_ERROR("Failed to get firmware from device.");
         else
             IDSetText(&MountFirmwareInfoTP, nullptr);
@@ -2033,18 +2203,31 @@ void StarGoTelescope::getBasicData()
         }
         IDSetSwitch(&MeridianFlipModeSP, nullptr);
 
-        int raSpeed, decSpeed;
-        if (getGuidingSpeeds(&raSpeed, &decSpeed))
+        int raRatio, decRatio;
+        if (getGearRatios(&raRatio, &decRatio))
         {
-            GuidingSpeedP[0].value = static_cast<double>(raSpeed) / 100.0;
-            GuidingSpeedP[1].value = static_cast<double>(decSpeed) / 100.0;
-            GuidingSpeedNP.s = IPS_OK;
+            GearRatioN[0].value = static_cast<double>(raRatio);
+            GearRatioN[1].value = static_cast<double>(decRatio);
+            GearRatioNP.s = IPS_OK;
         }
         else
         {
-            GuidingSpeedNP.s = IPS_ALERT;
+            GearRatioNP.s = IPS_ALERT;
         }
-        IDSetNumber(&GuidingSpeedNP, nullptr);
+        IDSetNumber(&GearRatioNP, nullptr);
+
+        int raSlew, decSlew;
+        if (getMaxSlews(&raSlew, &decSlew))
+        {
+            MaxSlewN[0].value = static_cast<double>(raSlew);
+            MaxSlewN[1].value = static_cast<double>(decSlew);
+            MaxSlewNP.s = IPS_OK;
+        }
+        else
+        {
+            MaxSlewNP.s = IPS_ALERT;
+        }
+        IDSetNumber(&MaxSlewNP, nullptr);
     }
 //    LOGF_DEBUG("sendLocation %s && %s", sendLocationOnStartup?"T":"F",
 //            (GetTelescopeCapability() & TELESCOPE_HAS_LOCATION)?"T":"F");
@@ -2065,8 +2248,20 @@ void StarGoTelescope::getBasicData()
  * @param firmwareInfo - firmware description
  * @return
 *******************************************************************************/
-bool StarGoTelescope::getFirmwareInfo (char* firmwareInfo)
+bool StarGoTelescope::getFirmwareInfo (char* firmwareInfo, char *mount, char *tcb )
 {
+/*
+ * Manufactuer
+ *      GVP
+ * Firmware version
+ *      GVN
+ * Firmware date
+ *      GVD
+ * TCB version:
+ *      X29 TCB=0000247
+ * Get Mount Type
+ *      TTGM
+ */
     LOG_DEBUG(__FUNCTION__);
     std::string infoStr;
     char manufacturer[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
@@ -2099,6 +2294,24 @@ bool StarGoTelescope::getFirmwareInfo (char* firmwareInfo)
     infoStr.append(" - ").append(dateStr, 1, dateStr.length()-1);
 
     strcpy(firmwareInfo, infoStr.c_str());
+
+    // step 4: get mount type
+    char mountType[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+    if (!sendQuery(":TTGM#", mountType))
+    {
+        LOG_ERROR("Failed to send get mount type request.");
+        return false;
+    }
+    strcpy(mount, mountType);
+
+    // step 5: get TCB cersion
+    char tcbVer[AVALON_RESPONSE_BUFFER_LENGTH] = {0};
+    if (!sendQuery(":X29#", tcbVer))
+    {
+        LOG_ERROR("Failed to send get TCB version request.");
+        return false;
+    }
+    strcpy(tcb, tcbVer);
 
     return true;
 }

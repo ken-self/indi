@@ -97,7 +97,19 @@ protected:
 
     // firmware info
     ITextVectorProperty MountFirmwareInfoTP;
-    IText MountFirmwareInfoT[1] = {};
+    IText MountFirmwareInfoT[3] = {};
+    
+    // Gear ratios
+    INumberVectorProperty GearRatioNP;
+    INumber GearRatioN[2];
+
+    // Max slew speed
+    INumberVectorProperty MaxSlewNP;
+    INumber MaxSlewN[2];
+
+    // Motor Step Position
+    INumberVectorProperty MotorStepNP;
+    INumber MotorStepN[2];
 
     // goto home
     ISwitchVectorProperty MountGotoHomeSP;
@@ -109,7 +121,7 @@ protected:
 
     // guiding
     INumberVectorProperty GuidingSpeedNP;
-    INumber GuidingSpeedP[2];
+    INumber GuidingSpeedN[2];
 
     ISwitchVectorProperty ST4StatusSP;
     ISwitch ST4StatusS[2];
@@ -174,6 +186,10 @@ protected:
     // autoguiding
     bool setGuidingSpeeds(int raSpeed, int decSpeed);
     bool getGuidingSpeeds(int *raSpeed, int *decSpeed);
+    bool getGearRatios(int *raRatio, int *decRatio);
+    bool getMaxSlews(int *raSlew, int *decSlew);
+    bool getMotorSteps(double *raSteps, double *decSteps);
+
     bool setST4Enabled(bool enabled);
     bool getST4Status(bool *isEnabled);
     int SendPulseCmd(int8_t direction, uint32_t duration_msec) ;
@@ -201,7 +217,7 @@ protected:
 
     // scope status
     void getBasicData();
-    bool getFirmwareInfo(char *version);
+    bool getFirmwareInfo(char *version, char *mount, char *tcb );
     bool getMotorStatus(int *xSpeed, int *ySpeed);
     bool getSideOfPier();
 
@@ -221,6 +237,7 @@ protected:
     bool receive(char* buffer, int* bytes, char end, int wait=AVALON_TIMEOUT);
     void flush();
     bool transmit(const char* buffer);
+    double ahex2int(char* ahex);
 
 };
 inline bool StarGoTelescope::isGuiding(){
@@ -233,6 +250,15 @@ inline bool StarGoTelescope::sendQuery(const char* cmd, char* response, int wait
 inline bool StarGoTelescope::receive(char* buffer, int* bytes, int wait)
 {
     return receive(buffer, bytes, '#', wait);
+}
+inline double StarGoTelescope::ahex2int(char* ahex)
+{
+    double val=0;
+    for(unsigned int i=0; i<strlen(ahex); i++)
+    {
+        val = val*16 + ahex[i] - 48;
+    }
+    return val;
 }
 
 #endif // STARGO_TELESCOPE_H
