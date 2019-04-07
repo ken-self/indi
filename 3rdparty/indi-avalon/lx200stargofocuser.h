@@ -36,6 +36,7 @@ public:
 
     void initProperties(const char *groupName);
     bool updateProperties();
+    bool ReadFocuserStatus();
 
     bool ISNewSwitch(const char *dev, const char *name, ISState *states, char *names[], int n);
     bool ISNewNumber(const char *dev, const char *name, double values[], char *names[], int n);
@@ -45,10 +46,11 @@ public:
 
     bool isConnected();
 
+    void activate(bool enabled);
+
 protected:
 
     // Avalon specifics
-    void focuserStatus();
     bool changeFocusSpeed(double values[], char* names[], int n);
     bool changeFocusMotion(ISState* states, char* names[], int n);
     bool changeFocusTimer(double values[], char* names[], int n);
@@ -74,6 +76,7 @@ protected:
     bool startMovingFocuserInward;
     bool startMovingFocuserOutward;
     uint32_t moveFocuserDurationRemaining;
+    bool focuserActivated;
 
 
     // LX200 commands
