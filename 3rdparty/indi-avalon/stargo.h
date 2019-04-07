@@ -99,6 +99,10 @@ protected:
     ITextVectorProperty MountFirmwareInfoTP;
     IText MountFirmwareInfoT[3] = {};
     
+    // RA Track Adjust
+    INumberVectorProperty TrackAdjustNP;
+    INumber TrackAdjustN[1];
+
     // Gear ratios
     INumberVectorProperty GearRatioNP;
     INumber GearRatioN[2];

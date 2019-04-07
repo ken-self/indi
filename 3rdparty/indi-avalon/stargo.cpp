@@ -329,10 +329,15 @@ bool StarGoTelescope::initProperties()
     IUFillText(&MountFirmwareInfoT[2], "MOUNT_TCB", "TCB", "");
     IUFillTextVector(&MountFirmwareInfoTP, MountFirmwareInfoT, 3, getDeviceName(), "MOUNT_INFO", "Mount Info", INFO_TAB, IP_RO, 60, IPS_OK);
 
-    // Gear Ratios
-    IUFillNumber(&GearRatioN[0], "GEAR_RATIO_RA", "RA Gearing", "%.2f", 0.0, 1000.0, 1, 0);
-    IUFillNumber(&GearRatioN[1], "GEAR_RATIO_DEC", "DEC Gearing", "%.2f", 0.0, 1000.0, 1, 0);
+    
+    // Tracking Adjustment
+    IUFillNumber(&TrackAdjustN[0], "GEAR_RATIO_RA", "RA Gearing", "%.2f", 0.0, 1000.0, 1, 0);
+    IUFillNumber(&TrackAdjustN[1], "GEAR_RATIO_DEC", "DEC Gearing", "%.2f", 0.0, 1000.0, 1, 0);
     IUFillNumberVector(&GearRatioNP, GearRatioN, 2, getDeviceName(), "Gear Ratio","Gearing", INFO_TAB, IP_RO, 60, IPS_IDLE);
+
+    // Gear Ratios
+    IUFillNumber(&GearRatioN[0], "RA_TRACK_ADJ", "RA Tracking Adjust", "%.2f", -500.0, 500.0, 1, 0);
+    IUFillNumberVector(&TrackAdjustNP, TrackAdjustN, 1, getDeviceName(), "Track Adjust","Tracking", INFO_TAB, IP_RO, 60, IPS_IDLE);
 
     // Max Slew Speeds
     IUFillNumber(&MaxSlewN[0], "MAX_SLEW_RA", "RA Max Slew", "%.2f", 0.0, 100.0, 1, 0);
@@ -420,6 +425,7 @@ bool StarGoTelescope::updateProperties()
         defineSwitch(&ST4StatusSP);
         defineSwitch(&MeridianFlipModeSP);
         defineText(&MountFirmwareInfoTP);
+        defineNumber(&TrackAdjustNP);
         defineNumber(&GearRatioNP);
         defineNumber(&MaxSlewNP);
         defineNumber(&MotorStepNP);
@@ -438,6 +444,7 @@ bool StarGoTelescope::updateProperties()
         deleteProperty(ST4StatusSP.name);
         deleteProperty(MeridianFlipModeSP.name);
         deleteProperty(MountFirmwareInfoTP.name);
+        deleteProperty(TrackAdjustNP.name);
         deleteProperty(GearRatioNP.name);
         deleteProperty(MaxSlewNP.name);
         deleteProperty(MotorStepNP.name);
